@@ -7,17 +7,22 @@ import mongoose from 'mongoose';
 
 describe('Users & ToDo E2E (with MongoMemoryServer)', () => {
   let app: INestApplication;
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
   let userId: string;
   let todoId: string;
 
   beforeAll(async () => {
-    // Crear Mongo en memoria
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-
-    // Sobrescribir conexión de Mongoose
-    process.env.MONGO_URI = uri;
+    // Si MONGO_URI está definido (ej. en CI con un contenedor MongoDB), úsalo.
+    let uri: string;
+    if (process.env.MONGO_URI) {
+      uri = process.env.MONGO_URI;
+    } else {
+      // Crear Mongo en memoria
+      mongod = await MongoMemoryServer.create();
+      uri = mongod.getUri();
+      // Sobrescribir conexión de Mongoose
+      process.env.MONGO_URI = uri;
+    }
 
     const moduleFixture = await Test.createTestingModule({
       imports: [
@@ -34,7 +39,9 @@ describe('Users & ToDo E2E (with MongoMemoryServer)', () => {
 
   afterAll(async () => {
     await mongoose.disconnect();
-    await mongod.stop();
+    if (mongod) {
+      await mongod.stop();
+    }
     await app.close();
   });
 

@@ -7,11 +7,16 @@ import mongoose from 'mongoose';
 
 describe('UsersService (Integration)', () => {
   let service: UsersService;
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
+    let uri: string;
+    if (process.env.MONGO_URI) {
+      uri = process.env.MONGO_URI;
+    } else {
+      mongod = await MongoMemoryServer.create();
+      uri = mongod.getUri();
+    }
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -26,7 +31,9 @@ describe('UsersService (Integration)', () => {
 
   afterAll(async () => {
     await mongoose.disconnect();
-    await mongod.stop();
+    if (mongod) {
+      await mongod.stop();
+    }
   });
 
   it('should create a user', async () => {
