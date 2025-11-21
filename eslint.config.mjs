@@ -1,6 +1,6 @@
 // @ts-check
 import eslint from '@eslint/js';
-import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import prettierPlugin from 'eslint-plugin-prettier';
 import securityPlugin from 'eslint-plugin-security';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -11,8 +11,13 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
-  securityPlugin.configs.recommended,
-  eslintPluginPrettierRecommended,
+  // Register plugin objects directly to be compatible with flat config
+  {
+    plugins: {
+      security: securityPlugin,
+      prettier: prettierPlugin,
+    },
+  },
   {
     languageOptions: {
       globals: {

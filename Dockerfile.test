@@ -4,9 +4,6 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Use npm install here because package-lock.json in the repo may be out of sync
-# `npm install` will fetch and install missing packages inside the image.
-# This is simpler for a CI test image build and avoids `npm ci` failures.
 RUN npm install --no-audit --no-fund --prefer-offline
 
 COPY . .
