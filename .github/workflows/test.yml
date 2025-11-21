@@ -1,4 +1,4 @@
-name: Tests & Security
+﻿name: Tests & Security
 
 on:
   push:
@@ -7,100 +7,105 @@ on:
     branches: [ main ]
 
 jobs:
-  
   unit-tests:
     runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       
-      - name: Install dependencies
-        run: npm ci
+      - name: Build test image
+        run: docker build -f Dockerfile.test -t my-api-test .
+      
+      - name: Run MongoDB for tests
+        run: |
+          docker network create test-network || true
+          docker run -d --name mongodb --network test-network \
+            -e MONGO_INITDB_ROOT_USERNAME=root \
+            -e MONGO_INITDB_ROOT_PASSWORD=password \
+            -e MONGO_INITDB_DATABASE=my-api \
+            mongo:7.0
+          sleep 15
       
       - name: Run unit tests
-        run: npm test
+        run: |
+          docker run --rm --network test-network \
+            -e MONGO_URI=mongodb://root:password@mongodb:27017/my-api?authSource=admin \
+            -e NODE_ENV=test \
+            my-api-test npm test
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop mongodb || true
+          docker rm mongodb || true
+          docker network rm test-network || true
 
-  # E2E 
   e2e-tests:
     runs-on: ubuntu-latest
-    
-    services:
-      mongodb:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-        env:
-          MONGO_INITDB_ROOT_USERNAME: root
-          MONGO_INITDB_ROOT_PASSWORD: password
-        options: >-
-          --health-cmd "mongosh localhost:27017/test --eval \"db.runCommand('ping')\" --quiet"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       
-      - name: Install dependencies
-        run: npm ci
+      - name: Build test image
+        run: docker build -f Dockerfile.test -t my-api-test .
       
-      - name: Build
-        run: npm run build
+      - name: Run MongoDB for e2e
+        run: |
+          docker network create e2e-network || true
+          docker run -d --name mongodb-e2e --network e2e-network \
+            -e MONGO_INITDB_ROOT_USERNAME=root \
+            -e MONGO_INITDB_ROOT_PASSWORD=password \
+            -e MONGO_INITDB_DATABASE=my-api \
+            mongo:7.0
+          sleep 15
       
       - name: Run e2e tests
-        run: npm run test:e2e
-        env:
-          MONGO_URI: mongodb://root:password@localhost:27017/my-api?authSource=admin
+        run: |
+          docker run --rm --network e2e-network \
+            -e MONGO_URI=mongodb://root:password@mongodb-e2e:27017/my-api?authSource=admin \
+            -e NODE_ENV=test \
+            my-api-test npm run test:e2e
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop mongodb-e2e || true
+          docker rm mongodb-e2e || true
+          docker network rm e2e-network || true
 
-  # Security
   security:
     runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       
-      - name: Install dependencies
-        run: npm ci
+      - name: Build test image
+        run: docker build -f Dockerfile.test -t my-api-test .
       
       - name: Run ESLint
-        run: npm run lint
+        run: docker run --rm my-api-test npm run lint
 
-  # Vulnerabilidades
   vulnerabilities:
     runs-on: ubuntu-latest
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       
-      - name: Install dependencies
-        run: npm ci
+      - name: Build test image
+        run: docker build -f Dockerfile.test -t my-api-test .
       
       - name: Check vulnerabilities
-        run: npm audit --production
+        run: docker run --rm my-api-test npm audit --production
         continue-on-error: true
-          MONGODB_URI: mongodb://root:password@localhost:27017/my-api?authSource=admin
-
